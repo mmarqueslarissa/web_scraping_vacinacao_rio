@@ -23,12 +23,12 @@ vaccin_rio <- read.csv("vaccination_rio.csv")
 
 ```
 
-ç
 
 ## Descrição da página 
 
-A página que foi raspada contém dados de vacinação para os 91[^1] munícipios do Estado do Rio de Janeiro. A página é dinânmica e devido a este fator, não foi possível utilizar o pacote HTTR[^2]. Para este web scraping, o pacote utilizado foi o *webdriver*. 
-O interesse pela raspagam desta página surgiu atrelado ao desenvolvimento de um trabalho acadêmico que objetivou, em conjunto com outros fatores de análise, a comparação do desempenho das 91 gestões municipais. 
+A página raspada contém os dados de vacinação dos 91[^1] munícipios do Estado do Rio de Janeiro. A página é dinâmica e por isso não foi possível utilizar o pacote HTTR[^2], usou-se então o pacote  *webdriver*.
+
+O interesse pela raspagam desta página surgiu atrelado ao desenvolvimento de um trabalho acadêmico que objetivou, em conjunto com outros fatores de análise, a comparação do desempenho das 91 gestões municipais
 
 
 ## Fluxo do web scraping 
@@ -41,19 +41,21 @@ Para suprir esta etapa eu utilizei o comando ctrl + shift + i e inspecionei como
 
 Esta etapa não foi necessária para eu atingir meu objetivo.
 
-### Como é a estrutura do arquivo a ser parseado? 
+### Como é a estrutura do site?
 
-
-```{r, echo=FALSE, fig.cap="Fig1: ScreenShot do código fonta da página"}
+```{r, echo=FALSE, fig.cap="Fig1: ScreenShot do código fonta da página",fig.width=10, fig.height=7}
 knitr::include_graphics("estrutura.jpeg")
 ```
 
+### Como é a estrutura do arquivo a ser parseado? 
+
+Após a correta conexão com o site e ao utilizar a função xml_find_all do pacote xml2 o tipo do dado é um xml_nodeset.
 
 ## Descrição de cada coluna da base
 
-O banco de dados está separado em 13 colunas e 91 observações.
+O banco de dados contém 13 variáveis e 91 observações.
 
-Sobre as colunas:
+Sobre as variáveis:
 
 - **id** = identificação do município;
 - **percent_d1** = percentual de primerias doses aplicadas;
@@ -69,6 +71,8 @@ Sobre as colunas:
 - **total_distributed_d2** = total de doses 2 distribuídas;
 - **total_distributed_du** = total de doses únicas distribuídas.
 
+### View do banco 
+
 ```{r, echo=FALSE, fig.cap="Tabela 1: Banco de vacinacão Rio de Janeiro"}
 
 DT::datatable(vaccin_rio, rownames = FALSE)
@@ -77,7 +81,145 @@ DT::datatable(vaccin_rio, rownames = FALSE)
 
 ## Análise descritiva dos dados
 
-```{r}
+### Primeira dose
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+summary(vaccin_rio$vaccined_count_d1)
+```
+
+### Segunda dose
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+summary(vaccin_rio$vaccined_count_d2)
+```
+
+### Doses únicas
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+summary(vaccin_rio$vaccined_count_du)
+```
+
+
+
+### Visualização das variáveis dependentes - número total de doses 1,2 e únicas aplicadas no Estado
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width=15, fig.height=10}
+
+options(scipen = 999999)
+
+
+banco_total_doses_aplicadas <- vaccin_rio %>% 
+  mutate(total_d1_aplicadas = sum(vaccined_count_d1),
+         total_d2_aplicadas = sum(vaccined_count_d2),
+         total_du_aplicadas = sum(vaccined_count_du), 
+         total_doses_aplicas = c(total_d1_aplicadas + total_d2_aplicadas + total_du_aplicadas)) %>% 
+  pivot_longer(cols = c("total_d1_aplicadas", "total_d2_aplicadas", "total_du_aplicadas"),
+               names_to = "num_doses_aplicadas", 
+               values_to = "num_total_doses_aplicadas")
+
+
+banco_total_doses_aplicadas %>% 
+  mutate(num_doses_aplicadas = case_when(num_doses_aplicadas == "total_d1_aplicadas" ~ "Primeira dose", 
+                                         num_doses_aplicadas == "total_d2_aplicadas" ~ "Segunda dose",
+                                         num_doses_aplicadas == "total_du_aplicadas" ~ "Dose única")) %>%
+  ggplot(aes(y=num_total_doses_aplicadas))+
+  geom_bar(aes(x= num_doses_aplicadas, fill = num_doses_aplicadas), position ="dodge", stat = "identity")+
+  ggthemes::theme_fivethirtyeight()+
+  theme(axis.title.y = element_text(size = 18),
+        axis.text.y = element_text(size = 18),
+        axis.text.x = element_text(size = 18),
+        plot.caption = element_text(size = 14),
+        panel.background = element_rect(fill = "white", colour = "white", color = "white"),
+        plot.background = element_rect(fill = "white", colour = "white", color = "white"),
+        legend.background=element_rect(fill="white"),
+        legend.key = element_rect(fill = "white", color = "white"),
+        strip.background=element_rect(fill="white", colour="white"), 
+        legend.position = "none")+
+   scale_fill_manual(values = c("#3399ff", "#91b6d4", "#4078a5"))+
+   xlim("Primeira dose", "Segunda dose", "Dose única")+
+   labs(title= "Número total de doses de vacina aplicadas no Rio de Janeiro",
+         y = "", 
+         x = "", 
+         caption = "Elaborado pela autora", 
+         fill = "")
+   
+
+```
+
+
+
+### Gráfico 3D para todos os municípios do Estado
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.width=10, fig.height=7}
+
+plotly::plot_ly(vaccin_rio, x= ~percent_d1, y=~log(total_population), 
+                z= ~total_distributed_d1, 
+                color = ~municipio_name)
+
+```
+
+
+```{r echo=FALSE}
+maiores_munis <- vaccin_rio %>% 
+   filter(total_population >= 261501 & total_population <= 6747816)
+```
+
+
+```{r, echo=FALSE}
+pop_semelhante <- vaccin_rio %>% 
+   filter(total_population >= 261501 & total_population <= 823302)
+```
+
+
+### Vacinação em munícipios do Rio de Janeiro que possuem tamanho populacional semelhantes
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width=15, fig.height=10}
+
+banco_percent_doses_aplicadas <- vaccin_rio %>% 
+    pivot_longer(cols = c("percent_d1", "percent_d2", "percent_du"),
+                 names_to = "doses", 
+                 values_to = "total_doses")
+ 
+  
+banco_percent_doses_aplicadas %>% 
+   mutate(doses = case_when(doses == "percent_d1" ~ "Primeira dose", 
+                            doses == "percent_d2" ~ "Segunda dose",
+                            doses == "percent_du" ~ "Dose única")) %>%
+  filter(total_population >= 261501 & total_population <= 823302) %>% 
+  ggplot(aes(y=total_doses))+
+  geom_bar(aes(x= municipio_name, fill= doses), position ="dodge", stat = "identity") +
+  scale_y_continuous(labels=function(x) paste0(x,"%"))+
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 5))+
+  ggthemes::theme_fivethirtyeight()+
+  theme(axis.title.y = element_text(size = 18),
+        axis.text.y = element_text(size = 18),
+        axis.text.x = element_text(size = 18),
+        legend.text = element_text(size = 16),
+        plot.caption = element_text(size = 14),
+        panel.background = element_rect(fill = "white", colour = "white", color = "white"),
+        plot.background = element_rect(fill = "white", colour = "white", color = "white"),
+        legend.background=element_rect(fill="white"),
+        legend.key = element_rect(fill = "white", color = "white"),
+        strip.background=element_rect(fill="white", colour="white"))+
+   scale_fill_manual(values = c("#3399ff", "#91b6d4", "#4078a5"))+
+   #xlim("Primeira dose", "Segunda dose", "Dose única")+
+   labs(title= "Doses de vacina aplicadas em 8 municípios do Rio de Janeiro",
+         y = "", 
+         x = "", 
+         caption = "Elaborado pela autora", 
+         fill = "")
+
+```
+
+
+### Gráfico 3D com 8 municípios com tamanho populacional semelhante
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.width=10, fig.height=7}
+
+plotly::plot_ly(pop_semelhante, x= ~percent_d1, y=~log(total_population), 
+                z= ~total_distributed_d1, 
+                color = ~municipio_name)
 
 ```
 
@@ -88,5 +230,5 @@ O desenvolvimento desse trabalho foi o meu primeiro contato com web scraping e t
 
 
 
-[^1]: Sabe-se que o Estado possui 92 municípios, porém, essa quantidade varia de acordo com a disponibilidade de dados no site. Até o dia da raspagem, não havia informacão para o munícipio de Quissamã.
+[^1]: Sabe-se que o Estado possui 92 municípios, porém, essa quantidade varia de acordo com a disponibilidade de dados no site. Até o dia da raspagem, não havia informação disponível para o munícipio de Quissamã.
 [^2]: Houve um teste com a função GET do pacote HTTR que não retornou as informações requisitadas. 
